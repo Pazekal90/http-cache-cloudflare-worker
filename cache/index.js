@@ -1,20 +1,31 @@
-const BYPASS_COOKIES = ["no_worker_cache=true", "ghost-admin-api-session"];
+const BYPASS_COOKIES = [];
 
-const BYPASS_PATH = ["/ghost/"];
+const BYPASS_PATH = [];
 
-const BYPASS_QUERY = [];
+const BYPASS_QUERY = ["no-cache"];
 
 const CACHE_ON_STATUS = [200, 301, 302, 303, 307, 404];
 
 const TRACKING_QUERY = new RegExp(
-  "(gclid|utm_(source|campaign|medium)|fb(cl)?id|fbclid)"
+  "(gclid|utm_(source|campaign|medium)|fb(cl)?id|fbclid|refid|extrefid)"
 );
+
+// Whether a two specific campaign cookies are added to the response
+// (and to the users browser) without getting them in and out of cache.  
+const SET_REFERRER_COOKIES = true;
+const refidparam = "refid";
+const refidcookiekey = "track[refid]";
+const extrefidparam = "extref";
+const extrefidcookiekey = "extref";
 
 addEventListener("fetch", (event) => {
   try {
     let request = event.request;
     // bypass cache on POST requests
-    if (request.method.toUpperCase() === "POST") return;
+    if (request.method.toUpperCase() === "POST") {
+      console.log("Request method is not GET. Exited!");
+      return;
+    }
     // bypass cache on specific cookies, url paths, or query parameters
     if (checkBypassCookie(request)) return;
     if (checkBypassPath(request)) return;
@@ -29,6 +40,7 @@ async function handleRequest(event) {
   try {
     let request = event.request;
     let cacheUrl = new URL(request.url);
+
     // remove tracking query parameters to increase cache hit ratio
     cacheUrl = await removeCampaignQueries(cacheUrl);
     let cacheRequest = new Request(cacheUrl, request);
@@ -41,9 +53,48 @@ async function handleRequest(event) {
 
     // check if url is already cached
     let response = await cache.match(cacheRequest);
-    // Use cache response when available, otherwise use origin response
-    if (!response) response = await originResponse;
+
+    // use cache response when available, otherwise use origin response
+    if (!response) {
+      response = await originResponse;
+      console.log("Request was not cached in Worker Cache API! I grabbed the origin response.");
+    }
+    else {
+      console.log("Request was cached in Worker Cache API! Delivered it from Cloudflare!");
+    }
+
+    // Extract REFID/EXTREF and set cookie Headers on Response without 
+    // having to cache every single url variant in cloudflare cache
+    // Attention: Both REFID cookise is set no matter if that affiliate even exists!
+    if(SET_REFERRER_COOKIES) {
+    
+      const { searchParams } = new URL(request.url);
+      let refidvalue = searchParams.get(refidparam);
+      let extrefidvalue = searchParams.get(extrefidparam);
+
+      let responseWithCookies = new Response(response.body, response);
+
+      if (refidvalue) {
+        const refidcookie = `${refidcookiekey}=${refidvalue}; Max-Age=2592000; path=/; secure; HttpOnly;`;
+        responseWithCookies.headers.append("Set-Cookie", refidcookie);
+      }
+
+      if (extrefidvalue) {
+        const extrefidcookie = `${extrefidcookiekey}=${extrefidvalue}; Max-Age=2592000; path=/; secure; HttpOnly;`;
+        responseWithCookies.headers.append("Set-Cookie", extrefidcookie);
+      }
+
+      if (responseWithCookies) {
+        console.log("Cookie Headers sent from Worker: " + JSON.stringify(responseWithCookies.headers.get("Set-Cookie")));
+        return responseWithCookies;
+      }
+      else {
+        return response;
+      }
+    }
+    //If the function to set cookies is totally disabled just return the whether or not cached response
     return response;
+    
   } catch (err) {
     return new Response(err.stack || err);
   }
@@ -76,14 +127,20 @@ async function getOrigin(event, request, cache, cacheRequest) {
     originResponse = new Response(originResponse.body, originResponse);
 
     if (CACHE_ON_STATUS.includes(originResponse.status)) {
+      // Before Altering get the cookie string from origin to logfile
+      console.log("Cookie Headers before altering: " + JSON.stringify(originResponse.headers.get("Set-Cookie")));
+
       // Delete cookie header so HTML can be cached
       originResponse.headers.delete("Set-Cookie");
 
       // Overwrite Cache-Control header so HTML can be cached
+      console.log("Cache Headers before altering: " + JSON.stringify(originResponse.headers.get("Cache-Control")));
       originResponse.headers.set(
         "Cache-Control",
         "public, s-maxage=604800, max-age=0"
       );
+
+      console.log("Cache Headers after altering: " + JSON.stringify(originResponse.headers.get("Cache-Control")));
 
       // waitUntil runs even after response has been sent
       event.waitUntil(cache.put(cacheRequest, originResponse.clone()));
