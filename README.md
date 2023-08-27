@@ -12,6 +12,13 @@ It has also some options:
 We improved our TTFB(Time to first byte) Speed by factor 5 in the most cases. 
 Remember: All HTML contents are the same for all of your users for those particular sites. 
 
+WITHOUT the caching Cloudflare Worker:
+![image](https://github.com/Pazekal90/http-cache-cloudflare-worker/assets/25208775/1b2420b3-f01c-47d7-9726-028a2aac30f8)
+
+WITH the caching Cloudflare Worker:
+![image](https://github.com/Pazekal90/http-cache-cloudflare-worker/assets/25208775/449d9ede-86cd-44bc-ae56-83501497ad43)
+
+
 HTML Request got a HIT from Cloudflare Cache as the result:
 ![image](https://github.com/Pazekal90/http-cache-cloudflare-worker/assets/25208775/61e669e2-b99e-4e2c-8820-370c861143fc)
 
