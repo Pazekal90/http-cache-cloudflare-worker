@@ -9,8 +9,8 @@ It has also some options:
 - Add cookies to the users browser if certain url parameters are present. This is useful to get affiliate cookies on the run to later payout your affiliates.
 - If there is a newer version from your origin after one visit, the next user will get this cached version. Cloudflare worker caches the newer version in the background while delivering the already cached version one last time but remarkebly faster to the user. 
 
-We improved our TTFB(Time to first byte) Speed by factor 5 in the most cases. 
-Remember: All HTML contents are the same for all of your users for those particular sites. 
+We improved our TTFB(Time to first byte) Speed by factor 5 in the most cases. It also halfes the metric of fdirst contentful paint and is totally noticable by the visitor in browser. Especially on mobile devices with little slower bandwidth.
+Remember: All HTML contents are the same for all of your users for those particular sites. So it maybe is NOT suitable for ALL pages on a shop for example.  
 
 WITHOUT the caching Cloudflare Worker:
 ![image](https://github.com/Pazekal90/http-cache-cloudflare-worker/assets/25208775/1b2420b3-f01c-47d7-9726-028a2aac30f8)
